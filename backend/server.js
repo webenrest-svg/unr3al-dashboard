@@ -5,13 +5,10 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Store all running jobs in memory
 const jobs = {}
 
-// Start a new job
 app.post('/api/jobs/start', (req, res) => {
   const jobId = Date.now().toString()
-  
   jobs[jobId] = {
     id: jobId,
     status: 'running',
@@ -20,34 +17,28 @@ app.post('/api/jobs/start', (req, res) => {
     spent: 0,
     accepted: 0,
     declined: 0,
-    maxOffers: req.body.offers || 50,
+    maxOffers: req.body.offers || 50
   }
-
-  // Simulate the job running every second
   const interval = setInterval(() => {
     const job = jobs[jobId]
     if (!job || job.status !== 'running') {
       clearInterval(interval)
       return
     }
-
     job.offered = Math.min(job.offered + 1, job.maxOffers)
     job.couldnt += Math.floor(Math.random() * 3)
     job.spent += 10 + Math.floor(Math.random() * 10)
     if (Math.random() > 0.85) job.accepted++
     if (Math.random() > 0.9) job.declined++
-
     if (job.offered >= job.maxOffers) {
       job.status = 'completed'
       clearInterval(interval)
     }
   }, 1000)
-
   jobs[jobId].interval = interval
   res.json({ jobId, status: 'started' })
 })
 
-// Get job status
 app.get('/api/jobs/:jobId', (req, res) => {
   const job = jobs[req.params.jobId]
   if (!job) return res.status(404).json({ error: 'Job not found' })
@@ -55,7 +46,6 @@ app.get('/api/jobs/:jobId', (req, res) => {
   res.json(jobData)
 })
 
-// Stop a job
 app.post('/api/jobs/:jobId/stop', (req, res) => {
   const job = jobs[req.params.jobId]
   if (!job) return res.status(404).json({ error: 'Job not found' })
@@ -64,12 +54,26 @@ app.post('/api/jobs/:jobId/stop', (req, res) => {
   res.json({ status: 'stopped' })
 })
 
-// Health check
+app.get('/api/sorare/cards', async (req, res) => {
+  const fetch = (await import('node-fetch')).default
+  const query = '{ tokens { liveAuctions(last: 5) { nodes { id currentPrice anyCards { slug name rarityTyped } } } } }'
+  try {
+    const response = await fetch('https://api.sorare.com/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    })
+    const data = await response.json()
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.get('/', (req, res) => {
   res.json({ message: 'unr3al backend running!' })
 })
 
-const PORT = 3001
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
+app.listen(3001, () => {
+  console.log('Server running on http://localhost:3001')
 })
